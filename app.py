@@ -1,13 +1,11 @@
-
 import streamlit as st
 import pandas as pd
 import requests
 import numpy as np
-from datetime import datetime, timezone
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
-    page_title="SPX AI Signals",
+    page_title="بوت مزوني | SPX",
     page_icon="📈",
     layout="wide"
 )
@@ -17,29 +15,107 @@ st_autorefresh(interval=10000, key="refresh")
 API = "https://biquote.io/api"
 SYMBOL = "US500"
 
-st.title("📈 SPX Trading Signals")
-st.caption("US500 CFD | 4H + 15M + 5M")
+st.markdown("""
+<style>
+.stApp {
+    background: #080a0e;
+    color: #f4f4f4;
+}
+header {visibility: hidden;}
+.block-container {
+    padding-top: 1.5rem;
+    max-width: 1250px;
+}
+h1,h2,h3,p,label {
+    color: #f4f4f4 !important;
+}
+.gold {
+    color: #d6b56d;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+.sub {
+    color: #9299a5;
+    font-size: 13px;
+}
+.panel {
+    background: linear-gradient(145deg,#171b24,#10131a);
+    border: 1px solid #30313a;
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 12px;
+}
+.metric-title {
+    color: #a6aab4;
+    font-size: 13px;
+}
+.metric-value {
+    color: #f4f4f4;
+    font-size: 25px;
+    font-weight: 800;
+    margin-top: 7px;
+}
+.gold-line {
+    border: 0;
+    height: 1px;
+    background: linear-gradient(90deg,transparent,#c9a65b,transparent);
+    margin: 20px 0;
+}
+.signal {
+    background: #171b24;
+    border: 1px solid #b9974e;
+    border-radius: 18px;
+    padding: 25px;
+    text-align: center;
+    margin: 12px 0;
+}
+.signal-title {
+    color: #d6b56d;
+    font-size: 13px;
+    letter-spacing: 3px;
+}
+.signal-value {
+    font-size: 36px;
+    font-weight: 900;
+    margin: 8px;
+}
+div[data-testid="stDataFrame"] {
+    border: 1px solid #30313a;
+    border-radius: 12px;
+}
+.stMetric {
+    background: #151922;
+    border: 1px solid #30313a;
+    padding: 12px;
+    border-radius: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 def get_json(url, params=None):
     r = requests.get(url, params=params, timeout=15)
     r.raise_for_status()
     return r.json()
 
+
 def get_quote():
     return get_json(f"{API}/{SYMBOL}")
+
 
 def get_candles(interval, limit=200):
     data = get_json(
         f"{API}/{SYMBOL}/ohlc",
         {"interval": interval, "limit": limit}
     )
+
     df = pd.DataFrame(data["bars"])
+
     if df.empty:
         raise ValueError(f"No candles: {interval}")
 
-    df["openTime"] = pd.to_datetime(
-        df["openTime"], utc=True
-    )
+    df["openTime"] = pd.to_datetime(df["openTime"], utc=True)
+
     for col in ["open", "high", "low", "close"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -51,6 +127,7 @@ def get_candles(interval, limit=200):
         raise ValueError(f"Not enough closed candles: {interval}")
 
     return df.reset_index(drop=True)
+
 
 def indicators(df):
     df = df.copy()
@@ -67,44 +144,39 @@ def indicators(df):
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
 
-    avg_gain = gain.ewm(
-        alpha=1/14, adjust=False
-    ).mean()
-
-    avg_loss = loss.ewm(
-        alpha=1/14, adjust=False
-    ).mean()
+    avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
 
     rs = avg_gain / avg_loss.replace(0, np.nan)
     df["rsi"] = 100 - (100 / (1 + rs))
 
     previous = df["close"].shift(1)
+
     tr = pd.concat([
         df["high"] - df["low"],
         (df["high"] - previous).abs(),
         (df["low"] - previous).abs()
     ], axis=1).max(axis=1)
 
-    df["atr"] = tr.ewm(
-        alpha=1/14, adjust=False
-    ).mean()
+    df["atr"] = tr.ewm(alpha=1/14, adjust=False).mean()
 
     return df
+
 
 def trend(row):
     if row["ema20"] > row["ema50"] and row["close"] > row["ema20"]:
         return "صاعد"
+
     if row["ema20"] < row["ema50"] and row["close"] < row["ema20"]:
         return "هابط"
+
     return "عرضي"
+
 
 def analyze(df):
     df = indicators(df)
     last = df.iloc[-1]
     previous = df.iloc[-21:-1]
-
-    resistance = previous["high"].max()
-    support = previous["low"].min()
 
     return {
         "trend": trend(last),
@@ -113,10 +185,24 @@ def analyze(df):
         "atr": float(last["atr"]),
         "ema20": float(last["ema20"]),
         "ema50": float(last["ema50"]),
-        "support": float(support),
-        "resistance": float(resistance),
+        "support": float(previous["low"].min()),
+        "resistance": float(previous["high"].max()),
         "time": last["openTime"]
     }
+
+
+# HEADER
+st.markdown("""
+<div style="text-align:center;padding:10px 0 20px">
+    <div class="gold">MAZONI BOT</div>
+    <h1 style="font-size:34px;margin:8px 0">
+        بوت مزوني
+    </h1>
+    <div class="sub">SPX TRADING • TECHNICAL ANALYSIS</div>
+    <div class="gold-line"></div>
+</div>
+""", unsafe_allow_html=True)
+
 
 try:
     quote = get_quote()
@@ -126,12 +212,13 @@ try:
     stale = quote.get("stale", True)
     market = quote.get("marketState", "unknown")
 
-    st.subheader("السعر المباشر من المصدر")
+    st.markdown("### 📊 بيانات السوق")
+
     a, b, c, d = st.columns(4)
 
     a.metric("US500", f"{price:.2f}")
-    b.metric("Bid", f"{quote['bid']:.2f}")
-    c.metric("Ask", f"{quote['ask']:.2f}")
+    b.metric("Bid", f"{float(quote['bid']):.2f}")
+    c.metric("Ask", f"{float(quote['ask']):.2f}")
     d.metric("عمر البيانات", f"{age} ثانية")
 
     st.caption(
@@ -140,7 +227,7 @@ try:
     )
 
     if stale or age > 60 or market != "open":
-        st.error("البيانات قديمة أو السوق مغلق. لا توجد إشارة تداول.")
+        st.warning("البيانات قديمة أو السوق مغلق. لا توجد إشارة تداول.")
         st.stop()
 
     df4 = get_candles("4h", 150)
@@ -151,8 +238,8 @@ try:
     m15 = analyze(df15)
     m5 = analyze(df5)
 
-    st.divider()
-    st.subheader("تحليل الاتجاه")
+    st.markdown('<div class="gold-line"></div>', unsafe_allow_html=True)
+    st.markdown("### 🧭 اتجاه السوق")
 
     x, y, z = st.columns(3)
 
@@ -160,7 +247,7 @@ try:
     y.metric("15 دقيقة", m15["trend"])
     z.metric("5 دقائق", m5["trend"])
 
-    st.subheader("المؤشرات الفنية")
+    st.markdown("### 📈 المؤشرات الفنية")
 
     table = pd.DataFrame([
         ["4 ساعات", h4["rsi"], h4["atr"], h4["close"]],
@@ -168,15 +255,19 @@ try:
         ["5 دقائق", m5["rsi"], m5["atr"], m5["close"]]
     ], columns=["الفريم", "RSI", "ATR", "الإغلاق"])
 
-    st.dataframe(table, use_container_width=True)
+    st.dataframe(
+        table.round(2),
+        use_container_width=True,
+        hide_index=True
+    )
 
-    st.subheader("الدعم والمقاومة - فريم 5 دقائق")
+    st.markdown("### 🎯 مستويات الدعم والمقاومة")
 
     s, r = st.columns(2)
+
     s.metric("الدعم", f"{m5['support']:.2f}")
     r.metric("المقاومة", f"{m5['resistance']:.2f}")
 
-    # شروط الاختراق والكسر على آخر شمعة مغلقة
     last5 = df5.iloc[-1]
     prev20 = df5.iloc[-21:-1]
 
@@ -199,8 +290,8 @@ try:
         and breakdown
     )
 
-    st.divider()
-    st.subheader("قرار التداول")
+    st.markdown('<div class="gold-line"></div>', unsafe_allow_html=True)
+    st.markdown("### ⚡ قرار بوت مزوني")
 
     if call:
         entry = price
@@ -209,11 +300,13 @@ try:
         target1 = entry + (1.5 * risk)
         target2 = entry + (2.5 * risk)
 
-        st.success("🟢 CALL - إشارة شراء مبدئية")
-        st.metric("الدخول المرجعي", f"{entry:.2f}")
-        st.metric("وقف الخسارة", f"{stop:.2f}")
-        st.metric("الهدف الأول", f"{target1:.2f}")
-        st.metric("الهدف الثاني", f"{target2:.2f}")
+        st.markdown("""
+        <div class="signal">
+            <div class="signal-title">TRADING SIGNAL</div>
+            <div class="signal-value" style="color:#24c982">CALL 🟢</div>
+            <div class="sub">إشارة شراء مبدئية</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     elif put:
         entry = price
@@ -222,20 +315,38 @@ try:
         target1 = entry - (1.5 * risk)
         target2 = entry - (2.5 * risk)
 
-        st.error("🔴 PUT - إشارة بيع مبدئية")
-        st.metric("الدخول المرجعي", f"{entry:.2f}")
-        st.metric("وقف الخسارة", f"{stop:.2f}")
-        st.metric("الهدف الأول", f"{target1:.2f}")
-        st.metric("الهدف الثاني", f"{target2:.2f}")
+        st.markdown("""
+        <div class="signal">
+            <div class="signal-title">TRADING SIGNAL</div>
+            <div class="signal-value" style="color:#ff5555">PUT 🔴</div>
+            <div class="sub">إشارة بيع مبدئية</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     else:
-        st.warning("⏳ انتظار - شروط الدخول غير مكتملة")
-        st.write("ننتظر توافق الاتجاه والاختراق أو الكسر.")
+        st.markdown("""
+        <div class="signal">
+            <div class="signal-title">TRADING SIGNAL</div>
+            <div class="signal-value" style="color:#d6b56d">WAIT ⏳</div>
+            <div class="sub">ننتظر اكتمال شروط الدخول</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if call or put:
+        a, b = st.columns(2)
+        a.metric("الدخول المرجعي", f"{entry:.2f}")
+        b.metric("وقف الخسارة", f"{stop:.2f}")
+
+        a, b = st.columns(2)
+        a.metric("الهدف الأول", f"{target1:.2f}")
+        b.metric("الهدف الثاني", f"{target2:.2f}")
+
+    st.markdown('<div class="gold-line"></div>', unsafe_allow_html=True)
 
     st.caption(
-        "تنبيه: هذا محرك قواعد فنية وليس نموذج ذكاء اصطناعي مدرباً. "
-        "الأسعار تخص US500 CFD وليست SPX النقدي أو سعر عقد الخيارات. "
-        "مستويات الوقف والأهداف تحليلية وليست ضماناً للتنفيذ."
+        "بوت مزوني | محرك قواعد فنية وليس نموذج ذكاء اصطناعي مدرباً. "
+        "البيانات تخص US500 CFD وليست مؤشر SPX النقدي أو سعر عقد الخيارات. "
+        "الإشارات والمستويات تحليلية وليست ضماناً للربح أو التنفيذ."
     )
 
 except Exception as e:

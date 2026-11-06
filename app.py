@@ -121,10 +121,17 @@ def get_candles(symbol, interval, limit=250):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # تحويل الوقت مع دعم الثواني أو الميلي ثانية
-    raw_time = pd.to_numeric(df["openTime"], errors="coerce")
-    unit = "ms" if raw_time.dropna().median() > 10**11 else "s"
-    df["time"] = pd.to_datetime(raw_time, unit=unit, utc=True, errors="coerce")
+    # Biquote يوثق openTime كسلسلة ISO مثل 2026-11-06T15:30:00Z،
+    # وقد يصل أحياناً كتوقيت رقمي بالثواني أو الميلي ثانية.
+    # نجرب ISO أولاً حتى لا تتحول كل الصفوف إلى NaT وتصبح الشموع صفراً.
+    parsed_time = pd.to_datetime(df["openTime"], utc=True, errors="coerce")
+    if parsed_time.isna().all():
+        raw_time = pd.to_numeric(df["openTime"], errors="coerce")
+        valid_times = raw_time.dropna()
+        if not valid_times.empty:
+            unit = "ms" if valid_times.median() > 10**11 else "s"
+            parsed_time = pd.to_datetime(raw_time, unit=unit, utc=True, errors="coerce")
+    df["time"] = parsed_time
     df = df.dropna(subset=["time", "open", "high", "low", "close"])
     df = df.sort_values("time").drop_duplicates("time").reset_index(drop=True)
 

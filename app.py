@@ -3,12 +3,11 @@ import streamlit as st
 import pandas as pd
 import requests
 import numpy as np
-import base64
 import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 
 # ==========================================
-# MAZONI BOT | SPX TECHNICAL ANALYSIS
+# MAZONI BOT
 # ==========================================
 
 st.set_page_config(
@@ -21,137 +20,169 @@ st_autorefresh(interval=10000, key="mazoni_refresh")
 
 API = "https://biquote.io/api"
 SYMBOL = "US500"
-BACKGROUND = "60494DB7-FE1A-4FC5-BB42-F385D41BA7A5.png"
 
 # ==========================================
-# DESIGN
+# DESIGN - NO BACKGROUND IMAGE
 # ==========================================
 
-try:
-    with open(BACKGROUND, "rb") as f:
-        bg = base64.b64encode(f.read()).decode()
-    background_css = f"""
-    background-image:
-    linear-gradient(rgba(3,5,9,.90),rgba(3,5,9,.94)),
-    url("data:image/png;base64,{bg}");
-    """
-except Exception:
-    background_css = "background:#080a0e;"
-
-st.markdown(f"""
+st.markdown("""
 <style>
-.stApp {{
-    {background_css}
-    background-size:cover;
-    background-position:center;
-    background-attachment:fixed;
-    color:#f5f0e5;
-}}
+.stApp {
+    background: #080a0e;
+    color: #f5f0e5;
+}
 
-header {{visibility:hidden;}}
+header {
+    visibility: hidden;
+}
 
-.block-container {{
-    max-width:1350px;
-    padding-top:1.2rem;
-    padding-bottom:3rem;
-}}
+.block-container {
+    max-width: 1350px;
+    padding-top: 1.2rem;
+    padding-bottom: 3rem;
+}
 
-h1,h2,h3,p,label {{
-    color:#f5f0e5 !important;
-}}
+h1, h2, h3, p, label {
+    color: #f5f0e5 !important;
+}
 
-.gold {{
-    color:#d7b56d;
-    letter-spacing:4px;
-    font-weight:900;
-}}
+.gold {
+    color: #d7b56d;
+    letter-spacing: 4px;
+    font-weight: 900;
+}
 
-.subtitle {{
-    color:#a9a08d;
-    font-size:12px;
-    letter-spacing:2px;
-}}
+.subtitle {
+    color: #a9a08d;
+    font-size: 12px;
+    letter-spacing: 2px;
+}
 
-.panel {{
-    background:rgba(12,16,23,.94);
-    border:1px solid rgba(201,165,91,.55);
-    border-radius:16px;
-    padding:18px;
-    margin-bottom:14px;
-}}
+.panel {
+    background: #11151d;
+    border: 1px solid #80683c;
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 14px;
+}
 
-.metric-box {{
-    background:rgba(12,16,23,.94);
-    border:1px solid #80683c;
-    border-radius:14px;
-    padding:15px;
-    min-height:95px;
-}}
+.signal {
+    background: #11151d;
+    border: 1px solid #b99550;
+    border-radius: 20px;
+    text-align: center;
+    padding: 25px 12px;
+    margin: 12px 0;
+}
 
-.metric-label {{
-    color:#a9a08d;
-    font-size:12px;
-}}
+.signal-title {
+    color: #d7b56d;
+    letter-spacing: 4px;
+    font-size: 12px;
+}
 
-.metric-number {{
-    color:#f5f0e5;
-    font-size:25px;
-    font-weight:800;
-    margin-top:8px;
-}}
+.signal-value {
+    font-size: 40px;
+    font-weight: 900;
+    margin: 8px;
+}
 
-.gold-line {{
-    height:1px;
-    background:linear-gradient(
-        90deg,transparent,#d7b56d,transparent
+.gold-line {
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        #d7b56d,
+        transparent
     );
-    margin:22px 0;
-}}
+    margin: 22px 0;
+}
 
-.signal {{
-    background:rgba(10,14,20,.96);
-    border:1px solid #b99550;
-    border-radius:20px;
-    text-align:center;
-    padding:25px 12px;
-    margin:12px 0;
-}}
+.stMetric {
+    background: #11151d;
+    border: 1px solid #80683c;
+    padding: 12px;
+    border-radius: 12px;
+}
 
-.signal-title {{
-    color:#d7b56d;
-    letter-spacing:4px;
-    font-size:12px;
-}}
+div[data-testid="stDataFrame"] {
+    border: 1px solid #80683c;
+    border-radius: 12px;
+}
 
-.signal-value {{
-    font-size:40px;
-    font-weight:900;
-    margin:8px;
-}}
+div[data-baseweb="select"] {
+    background: #11151d;
+}
 
-.stMetric {{
-    background:rgba(12,16,23,.94);
-    border:1px solid #80683c;
-    padding:12px;
-    border-radius:12px;
-}}
-
-div[data-testid="stDataFrame"] {{
-    border:1px solid #80683c;
-    border-radius:12px;
-}}
-
-.stSelectbox div[data-baseweb="select"] {{
-    background:#10151d;
-}}
-
-footer {{visibility:hidden;}}
+footer {
+    visibility: hidden;
+}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# DATA FUNCTIONS
+# HEADER
+# ==========================================
+
+st.markdown("""
+<div style="
+    text-align:center;
+    padding:25px 10px;
+    background:linear-gradient(145deg,#10141c,#17130b);
+    border:1px solid #b99550;
+    border-radius:22px;
+    margin-bottom:20px;
+">
+    <div style="font-size:48px;">👑</div>
+
+    <div style="
+        color:#d7b56d;
+        font-size:27px;
+        font-weight:900;
+        letter-spacing:5px;
+    ">
+        MAZONI BOT
+    </div>
+
+    <div style="
+        color:#f5f0e5;
+        font-size:32px;
+        font-weight:900;
+        margin:10px 0;
+    ">
+        بوت مزوني
+    </div>
+
+    <div style="
+        color:#a9a08d;
+        font-size:12px;
+        letter-spacing:3px;
+    ">
+        SMART MARKET ANALYSIS
+    </div>
+
+    <div style="
+        color:#d7b56d;
+        font-size:30px;
+        margin-top:15px;
+    ">
+        🐂　⚔　🐻
+    </div>
+
+    <div style="
+        height:1px;
+        background:linear-gradient(
+            90deg,transparent,#d7b56d,transparent
+        );
+        margin-top:20px;
+    "></div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ==========================================
+# DATA
 # ==========================================
 
 def get_json(url, params=None):
@@ -200,10 +231,11 @@ def get_candles(interval, limit=200):
     )
 
     if "isOpen" in df.columns:
-        df = df[
+        is_closed = (
             df["isOpen"].astype(str).str.lower()
             .isin(["false", "0"])
-        ].copy()
+        )
+        df = df[is_closed].copy()
 
     if len(df) < 55:
         raise ValueError(
@@ -309,6 +341,7 @@ def analyze(df):
 # ==========================================
 
 def make_chart(df, title):
+
     chart = go.Figure()
 
     chart.add_trace(
@@ -370,14 +403,22 @@ def make_chart(df, title):
     chart.update_layout(
         title=dict(
             text=title,
-            font=dict(color="#d7b56d", size=16)
+            font=dict(
+                color="#d7b56d",
+                size=16
+            )
         ),
         template="plotly_dark",
-        paper_bgcolor="rgba(8,10,15,0)",
-        plot_bgcolor="rgba(8,10,15,.7)",
+        paper_bgcolor="#080a0e",
+        plot_bgcolor="#0c1119",
         font=dict(color="#eee5d2"),
         height=480,
-        margin=dict(l=10, r=10, t=55, b=10),
+        margin=dict(
+            l=10,
+            r=10,
+            t=55,
+            b=10
+        ),
         xaxis_rangeslider_visible=False,
         legend=dict(
             orientation="h",
@@ -398,40 +439,6 @@ def make_chart(df, title):
     )
 
     return chart
-
-
-# ==========================================
-# HEADER
-# ==========================================
-
-st.markdown("""
-<div style="text-align:center;padding:12px 0 22px">
-
-    <div style="font-size:40px">👑</div>
-
-    <div class="gold" style="font-size:25px">
-        MAZONI BOT
-    </div>
-
-    <h1 style="font-size:34px;margin:8px 0">
-        بوت مزوني
-    </h1>
-
-    <div class="subtitle">
-        SMART MARKET ANALYSIS
-    </div>
-
-    <div style="
-        color:#c6a45e;
-        font-size:25px;
-        margin-top:10px;">
-        🐂　⚔　🐻
-    </div>
-
-    <div class="gold-line"></div>
-
-</div>
-""", unsafe_allow_html=True)
 
 
 # ==========================================
@@ -518,9 +525,11 @@ try:
     if timeframe == "4 ساعات":
         selected_df = h4["df"]
         selected_title = "US500 | 4H"
+
     elif timeframe == "15 دقيقة":
         selected_df = m15["df"]
         selected_title = "US500 | 15M"
+
     else:
         selected_df = m5["df"]
         selected_title = "US500 | 5M"
